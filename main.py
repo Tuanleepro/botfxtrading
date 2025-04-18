@@ -79,7 +79,7 @@ def auto_scan_loop():
 
 # Khởi chạy bot và server Flask
 if __name__ == "__main__":
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080), daemon=True).start()
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=10000), daemon=True).start()
     threading.Thread(target=auto_scan_loop, daemon=True).start()
 
     bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
