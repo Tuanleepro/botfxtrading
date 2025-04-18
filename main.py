@@ -27,7 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 application.add_handler(CommandHandler("start", start))
 
-# Bắt lỗi chung Telegram
+# Bắt lỗi Telegram
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     print(f"❌ Lỗi không xác định: {context.error}", flush=True)
 
@@ -38,12 +38,12 @@ application.add_error_handler(error_handler)
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# ✅ FIXED: Route webhook dùng asyncio.run() để đảm bảo không lỗi loop
+# ✅ FIXED: Route webhook async để không đóng event loop sớm
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
-def webhook():
+async def webhook():
     try:
         update = Update.de_json(request.get_json(), application.bot)
-        asyncio.run(application.process_update(update))
+        await application.process_update(update)
         return 'ok'
     except Exception as e:
         print("❌ Lỗi trong webhook:", e, flush=True)
