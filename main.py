@@ -3,6 +3,7 @@ from flask import Flask, request
 import requests
 import threading
 import time
+import datetime
 import signal_engine
 
 from telegram import Update, InputFile
@@ -57,24 +58,31 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e)
 
-# Vòng lặp quét tín hiệu tự động
+# Vòng lặp quét tín hiệu tự động (chỉ chạy T2-T6)
 def auto_scan_loop():
     global last_signal_cache
     while True:
-        try:
-            signals = signal_engine.get_trade_signal()
-            if signals:
-                new_signals = [s for s in signals if s not in last_signal_cache]
-                if new_signals:
-                    last_signal_cache = signals
-                    for signal in new_signals:
-                        send_signal_with_chart(signal)
+        now = datetime.datetime.now()
+        weekday = now.weekday()  # Thứ 0 = Monday, Thứ 6 = Saturday
+
+        if weekday < 5:  # Chỉ chạy từ thứ 2 đến thứ 6
+            try:
+                signals = signal_engine.get_trade_signal()
+                if signals:
+                    new_signals = [s for s in signals if s not in last_signal_cache]
+                    if new_signals:
+                        last_signal_cache = signals
+                        for signal in new_signals:
+                            send_signal_with_chart(signal)
+                    else:
+                        print("⚠️ Không có tín hiệu mới (bị trùng).")
                 else:
-                    print("⚠️ Không có tín hiệu mới (bị trùng).")
-            else:
-                print("⏳ Chưa có tín hiệu TradingView phù hợp.")
-        except Exception as e:
-            print("❌ Lỗi khi quét tín hiệu:", e)
+                    print("⏳ Chưa có tín hiệu TradingView phù hợp.")
+            except Exception as e:
+                print("❌ Lỗi khi quét tín hiệu:", e)
+        else:
+            print("📆 Hôm nay là Thứ 7 hoặc Chủ nhật. Tạm dừng bot.")
+
         time.sleep(900)  # 15 phút
 
 # Khởi chạy bot và server Flask
