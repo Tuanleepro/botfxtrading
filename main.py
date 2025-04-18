@@ -38,14 +38,12 @@ application.add_error_handler(error_handler)
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook (event loop riêng an toàn)
+# ✅ FIXED: Route webhook dùng asyncio.run() để đảm bảo không lỗi loop
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
         update = Update.de_json(request.get_json(), application.bot)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(application.process_update(update))
+        asyncio.run(application.process_update(update))
         return 'ok'
     except Exception as e:
         print("❌ Lỗi trong webhook:", e, flush=True)
