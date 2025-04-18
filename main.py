@@ -15,7 +15,6 @@ WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"
 
 app = Flask(__name__)
 last_signal_cache = []
-
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # /start
@@ -39,14 +38,18 @@ application.add_error_handler(error_handler)
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook — giờ không cần gọi initialize nữa
+# Route webhook (dùng Flask sync + xử lý async riêng)
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
-async def webhook():
-    update = Update.de_json(request.get_json(), application.bot)
-    await application.process_update(update)
-    return 'ok'
+def webhook():
+    try:
+        update = Update.de_json(request.get_json(), application.bot)
+        asyncio.create_task(application.process_update(update))
+        return 'ok'
+    except Exception as e:
+        print("❌ Lỗi trong webhook:", e, flush=True)
+        return 'internal error', 500
 
-# Gửi thủ công
+# Gửi tín hiệu thủ công
 @app.route('/send', methods=['POST'])
 def send():
     data = request.get_json()
@@ -58,7 +61,7 @@ def send():
     print("📤 Gửi tín hiệu thủ công:", message, flush=True)
     return "Message sent!", 200
 
-# Gửi ảnh
+# Gửi tín hiệu kèm ảnh
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 🎯 Entry: {signal['entry']}
@@ -78,7 +81,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Auto scan
+# Vòng quét tín hiệu
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -110,10 +113,10 @@ def setup_webhook():
     else:
         print("❌ Lỗi thiết lập webhook:", response.text, flush=True)
 
-# Hàm khởi chạy chính
+# Hàm chạy chính
 async def run():
     setup_webhook()
-    await application.initialize()  # ✅ Gọi duy nhất 1 lần ở đây
+    await application.initialize()
     threading.Thread(target=auto_scan_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
