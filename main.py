@@ -87,7 +87,7 @@ def auto_scan_loop():
                 print("⏳ Chưa có tín hiệu TradingView phù hợp.", flush=True)
         except Exception as e:
             print("❌ Lỗi khi quét tín hiệu:", e, flush=True)
-        time.sleep(30)  # 👉 test nhanh, sau đổi lại 900
+        time.sleep(900)  # 👉 test nhanh, sau đổi lại 900
 
 # Khởi tạo bot app
 application = ApplicationBuilder().token(BOT_TOKEN).build()
