@@ -17,11 +17,11 @@ app = Flask(__name__)
 last_signal_cache = []
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# /start
+# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         print("🔥 Đã nhận /start từ:", update.effective_user.username, flush=True)
-        asyncio.create_task(update.message.reply_text("🤖 Bot TradingView đã sẵn sàng rồi nè!"))
+        await update.message.reply_text("🤖 Bot TradingView đã sẵn sàng rồi nè!")
     except Exception as e:
         print("❌ Lỗi khi xử lý /start:", e, flush=True)
 
@@ -38,7 +38,7 @@ application.add_error_handler(error_handler)
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook (dùng event loop riêng an toàn)
+# Route webhook (event loop riêng an toàn)
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
@@ -91,7 +91,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Quét tín hiệu định kỳ
+# Auto quét tín hiệu
 def auto_scan_loop():
     global last_signal_cache
     while True:
