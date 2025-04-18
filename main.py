@@ -13,7 +13,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # === Cấu hình ===
 BOT_TOKEN = "7331189117:AAFjEXI-8rsNH4QXbxZLgiHbbSlyIvCqP3s"
 CHAT_ID = "576589496"
-WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"  # ⚠️ Nhớ đổi nếu domain khác
+WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"
 
 app = Flask(__name__)
 last_signal_cache = []
@@ -23,10 +23,11 @@ last_signal_cache = []
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook để nhận update từ Telegram
+# Route webhook để nhận update từ Telegram (đã thêm initialize)
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 async def webhook():
     update = Update.de_json(request.get_json(), application.bot)
+    await application.initialize()  # 👈 Bắt buộc phải gọi để tránh lỗi RuntimeError
     await application.process_update(update)
     return 'ok'
 
@@ -44,6 +45,7 @@ def send():
 
 # Lệnh kiểm tra bot
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("🔥 Đã nhận /start từ:", update.effective_user.username, flush=True)
     await update.message.reply_text("🤖 Bot TradingView đã sẵn sàng rồi nè!")
 
 # Gửi tín hiệu kèm ảnh
@@ -66,7 +68,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# ✅ Bản sửa hoàn chỉnh: auto_scan_loop có flush + sleep 30s để test
+# Vòng lặp quét tín hiệu TradingView
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -87,13 +89,13 @@ def auto_scan_loop():
                 print("⏳ Chưa có tín hiệu TradingView phù hợp.", flush=True)
         except Exception as e:
             print("❌ Lỗi khi quét tín hiệu:", e, flush=True)
-        time.sleep(900)  # 👉 test nhanh, sau đổi lại 900
+        time.sleep(900)  # hoặc chỉnh xuống 60s khi test
 
-# Khởi tạo bot app
+# Khởi tạo bot
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 application.add_handler(CommandHandler("start", start))
 
-# Thiết lập webhook khi khởi động
+# Thiết lập webhook
 def setup_webhook():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
     response = requests.post(url, json={"url": WEBHOOK_URL})
@@ -102,7 +104,7 @@ def setup_webhook():
     else:
         print("❌ Lỗi thiết lập webhook:", response.text, flush=True)
 
-# Khởi động Flask + auto_scan
+# Chạy Flask và auto scan
 if __name__ == "__main__":
     setup_webhook()
     threading.Thread(target=auto_scan_loop, daemon=True).start()
