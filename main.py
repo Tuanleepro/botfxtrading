@@ -1,4 +1,4 @@
-# main.py - Gửi tín hiệu kèm ảnh biểu đồ từ signal_engine.py (webhook version)
+# main.py - Sửa lỗi phản hồi 1 lần duy nhất, giữ toàn bộ chức năng
 from flask import Flask, request
 import requests
 import threading
@@ -10,16 +10,13 @@ import asyncio
 from telegram import Update, InputFile
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# === Cấu hình ===
 BOT_TOKEN = "7331189117:AAFjEXI-8rsNH4QXbxZLgiHbbSlyIvCqP3s"
 CHAT_ID = "576589496"
 WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"
 
 app = Flask(__name__)
 last_signal_cache = []
-is_initialized = False  # 👈 Cờ để chỉ gọi initialize() một lần
 
-# Khởi tạo bot Telegram
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # /start
@@ -32,31 +29,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 application.add_handler(CommandHandler("start", start))
 
-# Bắt lỗi tổng
+# Bắt lỗi
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     print(f"❌ Lỗi không xác định: {context.error}", flush=True)
 
 application.add_error_handler(error_handler)
 
-# Route ping UptimeRobot
+# Route ping
 @app.route('/')
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook Telegram
+# Route webhook — giờ không cần gọi initialize nữa
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 async def webhook():
-    global is_initialized
     update = Update.de_json(request.get_json(), application.bot)
-
-    if not is_initialized:
-        await application.initialize()
-        is_initialized = True
-
     await application.process_update(update)
     return 'ok'
 
-# Gửi tín hiệu thủ công
+# Gửi thủ công
 @app.route('/send', methods=['POST'])
 def send():
     data = request.get_json()
@@ -68,7 +59,7 @@ def send():
     print("📤 Gửi tín hiệu thủ công:", message, flush=True)
     return "Message sent!", 200
 
-# Gửi tín hiệu kèm ảnh
+# Gửi ảnh
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 🎯 Entry: {signal['entry']}
@@ -88,7 +79,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Auto scan tín hiệu
+# Auto scan
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -120,8 +111,13 @@ def setup_webhook():
     else:
         print("❌ Lỗi thiết lập webhook:", response.text, flush=True)
 
-# Run
-if __name__ == "__main__":
+# Hàm khởi chạy chính
+async def run():
     setup_webhook()
+    await application.initialize()  # ✅ Gọi duy nhất 1 lần ở đây
     threading.Thread(target=auto_scan_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+# Gọi chạy
+if __name__ == "__main__":
+    asyncio.run(run())
