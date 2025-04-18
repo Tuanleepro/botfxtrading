@@ -9,15 +9,17 @@ import asyncio
 from telegram import Update, InputFile
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
+# === Cấu hình ===
 BOT_TOKEN = "7331189117:AAFjEXI-8rsNH4QXbxZLgiHbbSlyIvCqP3s"
 CHAT_ID = "576589496"
 WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"
 
+# === Khởi tạo Flask + Telegram Application
 app = Flask(__name__)
 last_signal_cache = []
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# /start
+# === /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         print("🔥 Đã nhận /start từ:", update.effective_user.username, flush=True)
@@ -27,29 +29,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 application.add_handler(CommandHandler("start", start))
 
-# Bắt lỗi
+# === Bắt lỗi Telegram
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     print(f"❌ Lỗi không xác định: {context.error}", flush=True)
 
 application.add_error_handler(error_handler)
 
-# Route ping
+# === Route ping UptimeRobot
 @app.route('/')
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook
+# === Route nhận webhook từ Telegram — ĐÃ FIX EVENT LOOP
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
         update = Update.de_json(request.get_json(), application.bot)
-        asyncio.create_task(application.process_update(update))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(application.process_update(update))
+        loop.close()
         return 'ok'
     except Exception as e:
         print("❌ Lỗi trong webhook:", e, flush=True)
         return 'internal error', 500
 
-# Gửi thủ công
+# === Gửi tín hiệu thủ công
 @app.route('/send', methods=['POST'])
 def send():
     data = request.get_json()
@@ -61,7 +66,7 @@ def send():
     print("📤 Gửi tín hiệu thủ công:", message, flush=True)
     return "Message sent!", 200
 
-# Gửi tín hiệu kèm ảnh
+# === Gửi tín hiệu kèm ảnh
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 🎯 Entry: {signal['entry']}
@@ -81,7 +86,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Quét tín hiệu định kỳ
+# === Vòng quét tín hiệu định kỳ
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -104,7 +109,7 @@ def auto_scan_loop():
             print("❌ Lỗi khi quét tín hiệu:", e, flush=True)
         time.sleep(900)
 
-# Thiết lập webhook
+# === Thiết lập webhook cho Telegram
 def setup_webhook():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
     response = requests.post(url, json={"url": WEBHOOK_URL})
@@ -113,7 +118,7 @@ def setup_webhook():
     else:
         print("❌ Lỗi thiết lập webhook:", response.text, flush=True)
 
-# Chạy
+# === Khởi chạy chính
 if __name__ == "__main__":
     setup_webhook()
     asyncio.run(application.initialize())
