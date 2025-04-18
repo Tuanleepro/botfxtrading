@@ -14,7 +14,7 @@ CHAT_ID = "576589496"
 app = Flask(__name__)
 last_signal_cache = []
 
-# Bot command /start
+# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         print("🔥 Đã nhận /start từ:", update.effective_user.username, flush=True)
@@ -22,7 +22,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("❌ Lỗi khi xử lý /start:", e, flush=True)
 
-# Gửi tín hiệu có ảnh
+# Gửi ảnh + thông điệp
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 🎯 Entry: {signal['entry']}
@@ -44,7 +44,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Quét tín hiệu định kỳ
+# Tự động quét tín hiệu mỗi 15 phút
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -65,9 +65,9 @@ def auto_scan_loop():
                 print("⏳ Chưa có tín hiệu TradingView phù hợp.", flush=True)
         except Exception as e:
             print("❌ Lỗi khi quét tín hiệu:", e, flush=True)
-        time.sleep(900)
+        time.sleep(900)  # mỗi 15 phút
 
-# Route để gửi tín hiệu thủ công
+# Route gửi thủ công
 @app.route("/send", methods=["POST"])
 def send():
     data = request.get_json()
@@ -85,14 +85,22 @@ def send():
         print("❌ Gửi thủ công lỗi:", e, flush=True)
     return "Message sent!", 200
 
-# Route để UptimeRobot ping
+# Route ping cho UptimeRobot
 @app.route("/")
 def index():
-    return "✅ Bot is alive with polling and auto signal!"
+    return "✅ Bot is alive with polling + auto signal!"
 
-# Khởi tạo bot và chạy polling
+# Chạy bot Telegram + Flask server song song
 if __name__ == "__main__":
     threading.Thread(target=auto_scan_loop, daemon=True).start()
-    app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
-    app_bot.add_handler(CommandHandler("start", start))
-    app_bot.run_polling()
+
+    def run_flask():
+        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+    def run_bot():
+        app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
+        app_bot.add_handler(CommandHandler("start", start))
+        app_bot.run_polling()
+
+    threading.Thread(target=run_flask, daemon=True).start()
+    run_bot()
