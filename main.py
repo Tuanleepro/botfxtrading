@@ -25,9 +25,9 @@ def index():
 
 # Route webhook để nhận update từ Telegram
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
-def webhook():
+async def webhook():
     update = Update.de_json(request.get_json(), application.bot)
-    asyncio.run(application.process_update(update))
+    await application.process_update(update)
     return 'ok'
 
 # Gửi tín hiệu thủ công qua API
