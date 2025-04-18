@@ -1,9 +1,11 @@
-# main.py - Gửi tín hiệu kèm ảnh biểu đồ từ signal_engine.py
+# main.py - Gửi tín hiệu kèm ảnh biểu đồ từ signal_engine.py (webhook version)
 from flask import Flask, request
 import requests
 import threading
 import time
 import signal_engine
+import os
+import asyncio
 
 from telegram import Update, InputFile
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -11,14 +13,22 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # === Cấu hình ===
 BOT_TOKEN = "7331189117:AAFjEXI-8rsNH4QXbxZLgiHbbSlyIvCqP3s"
 CHAT_ID = "576589496"
+WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"  # ⚠️ THAY BẰNG LINK APP CỦA BẠN
 
 app = Flask(__name__)
 last_signal_cache = []
 
-# Route cho UptimeRobot ping
+# Route mặc định để UptimeRobot ping
 @app.route('/')
 def index():
-    return "✅ Bot is running with TradingView data!"
+    return "✅ Bot is running with webhook + TradingView data!"
+
+# Route webhook để nhận update từ Telegram
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def webhook():
+    update = Update.de_json(request.get_json(), application.bot)
+    asyncio.run(application.process_update(update))
+    return 'ok'
 
 # Gửi tín hiệu thủ công qua API
 @app.route('/send', methods=['POST'])
@@ -26,7 +36,6 @@ def send():
     data = request.get_json()
     if not data:
         return "No JSON payload", 400
-
     message = f"{data['side']} {data['symbol']}\nSL: {data['sl']}\nTP: {data['tp']}"
     telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     requests.post(telegram_url, json={"chat_id": CHAT_ID, "text": message})
@@ -37,7 +46,7 @@ def send():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤖 Bot TradingView đã sẵn sàng rồi nè!")
 
-# Hàm gửi tín hiệu có ảnh chart
+# Gửi tín hiệu kèm ảnh
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 🎯 Entry: {signal['entry']}
@@ -57,7 +66,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e)
 
-# Vòng lặp quét tín hiệu tự động
+# Vòng lặp quét tín hiệu
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -77,11 +86,21 @@ def auto_scan_loop():
             print("❌ Lỗi khi quét tín hiệu:", e)
         time.sleep(900)  # 15 phút
 
-# Khởi chạy bot và server Flask
-if __name__ == "__main__":
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=10000), daemon=True).start()
-    threading.Thread(target=auto_scan_loop, daemon=True).start()
+# Khởi tạo bot app
+application = ApplicationBuilder().token(BOT_TOKEN).build()
+application.add_handler(CommandHandler("start", start))
 
-    bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
-    bot_app.add_handler(CommandHandler("start", start))
-    bot_app.run_polling()
+# Thiết lập webhook khi khởi động
+def setup_webhook():
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
+    response = requests.post(url, json={"url": WEBHOOK_URL})
+    if response.status_code == 200:
+        print("✅ Đã thiết lập webhook thành công.")
+    else:
+        print("❌ Lỗi thiết lập webhook:", response.text)
+
+# Khởi động Flask + auto_scan
+if __name__ == "__main__":
+    setup_webhook()
+    threading.Thread(target=auto_scan_loop, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
