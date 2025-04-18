@@ -10,7 +10,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # === Cấu hình ===
-BOT_TOKEN = "7331189117:AAHYXCB5VhkG2Hrr4jySusQmnleQtzTfhl4"
+BOT_TOKEN = "7331189117:AAFjEXI-8rsNH4QXbxZLgiHbbSlyIvCqP3s"
 CHAT_ID = "576589496"
 
 app = Flask(__name__)
