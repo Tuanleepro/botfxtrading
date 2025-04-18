@@ -1,6 +1,6 @@
-flask[async]
+flask[async]==2.3.3
 requests
-pandas
-matplotlib
 python-telegram-bot==20.3
-
+matplotlib
+pandas
+asgiref==3.7.2
