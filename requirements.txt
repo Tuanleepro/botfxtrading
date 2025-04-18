@@ -1,6 +1,6 @@
-flask[async]==2.3.3
-requests
+Flask==2.3.3
+requests==2.31.0
 python-telegram-bot==20.3
-matplotlib
-pandas
 asgiref==3.7.2
+matplotlib==3.8.3
+pandas==2.2.2
