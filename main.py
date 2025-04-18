@@ -3,10 +3,9 @@ from flask import Flask, request
 import requests
 import threading
 import time
-import datetime
 import signal_engine
 
-from telegram import Update
+from telegram import Update, InputFile
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # === Cấu hình ===
@@ -16,12 +15,12 @@ CHAT_ID = "576589496"
 app = Flask(__name__)
 last_signal_cache = []
 
-# Route kiểm tra bot online
+# Route cho UptimeRobot ping
 @app.route('/')
 def index():
     return "✅ Bot is running with TradingView data!"
 
-# Gửi tín hiệu thủ công
+# Gửi tín hiệu thủ công qua API
 @app.route('/send', methods=['POST'])
 def send():
     data = request.get_json()
@@ -38,7 +37,7 @@ def send():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤖 Bot TradingView đã sẵn sàng rồi nè!")
 
-# Gửi ảnh chart kèm tín hiệu
+# Hàm gửi tín hiệu có ảnh chart
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 🎯 Entry: {signal['entry']}
@@ -50,37 +49,35 @@ def send_signal_with_chart(signal):
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
             files = {"photo": photo}
             data = {"chat_id": CHAT_ID, "caption": msg}
-            requests.post(url, files=files, data=data)
-            print("✅ Đã gửi tín hiệu:", signal["symbol"])
+            response = requests.post(url, files=files, data=data)
+            if response.status_code == 200:
+                print("✅ Đã gửi tín hiệu kèm ảnh:", signal["symbol"])
+            else:
+                print("⚠️ Gửi ảnh thất bại:", response.text)
     except Exception as e:
-        print("❌ Lỗi gửi ảnh:", e)
+        print("❌ Lỗi khi gửi ảnh biểu đồ:", e)
 
-# Vòng lặp quét tín hiệu mỗi 15 phút, chỉ T2 → T6
+# Vòng lặp quét tín hiệu tự động
 def auto_scan_loop():
     global last_signal_cache
     while True:
-        weekday = datetime.datetime.now().weekday()  # 0=Thứ 2, 6=Chủ nhật
-        if weekday <= 4:  # Thứ 2 đến Thứ 6
-            try:
-                signals = signal_engine.get_trade_signal()
-                if signals:
-                    new_signals = [s for s in signals if s not in last_signal_cache]
-                    if new_signals:
-                        last_signal_cache = signals
-                        for signal in new_signals:
-                            send_signal_with_chart(signal)
-                    else:
-                        print("⚠️ Không có tín hiệu mới (bị trùng)")
+        try:
+            signals = signal_engine.get_trade_signal()
+            if signals:
+                new_signals = [s for s in signals if s not in last_signal_cache]
+                if new_signals:
+                    last_signal_cache = signals
+                    for signal in new_signals:
+                        send_signal_with_chart(signal)
                 else:
-                    print("⏳ Chưa có tín hiệu phù hợp.")
-            except Exception as e:
-                print("❌ Lỗi quét tín hiệu:", e)
-        else:
-            print("📆 Hôm nay là Thứ 7/CN, bot đang nghỉ.")
-
+                    print("⚠️ Không có tín hiệu mới (bị trùng).")
+            else:
+                print("⏳ Chưa có tín hiệu TradingView phù hợp.")
+        except Exception as e:
+            print("❌ Lỗi khi quét tín hiệu:", e)
         time.sleep(900)  # 15 phút
 
-# Khởi chạy
+# Khởi chạy bot và server Flask
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080), daemon=True).start()
     threading.Thread(target=auto_scan_loop, daemon=True).start()
