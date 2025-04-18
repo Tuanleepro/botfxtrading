@@ -1,0 +1,6 @@
+flask
+requests
+pandas
+matplotlib
+python-telegram-bot==20.3
+telegram
