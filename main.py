@@ -38,7 +38,7 @@ application.add_error_handler(error_handler)
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook (dùng Flask sync + xử lý async riêng)
+# Route webhook
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
@@ -49,7 +49,7 @@ def webhook():
         print("❌ Lỗi trong webhook:", e, flush=True)
         return 'internal error', 500
 
-# Gửi tín hiệu thủ công
+# Gửi thủ công
 @app.route('/send', methods=['POST'])
 def send():
     data = request.get_json()
@@ -81,7 +81,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Vòng quét tín hiệu
+# Quét tín hiệu định kỳ
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -113,13 +113,9 @@ def setup_webhook():
     else:
         print("❌ Lỗi thiết lập webhook:", response.text, flush=True)
 
-# Hàm chạy chính
-async def run():
+# Chạy
+if __name__ == "__main__":
     setup_webhook()
-    await application.initialize()
+    asyncio.run(application.initialize())
     threading.Thread(target=auto_scan_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-
-# Gọi chạy
-if __name__ == "__main__":
-    asyncio.run(run())
