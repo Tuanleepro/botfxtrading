@@ -17,11 +17,12 @@ WEBHOOK_URL = f"https://botfxtrading.onrender.com/{BOT_TOKEN}"
 
 app = Flask(__name__)
 last_signal_cache = []
+is_initialized = False  # 👈 Cờ để chỉ gọi initialize() một lần
 
 # Khởi tạo bot Telegram
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# Gắn handler cho lệnh /start
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         print("🔥 Đã nhận /start từ:", update.effective_user.username, flush=True)
@@ -31,25 +32,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 application.add_handler(CommandHandler("start", start))
 
-# Gắn handler để log lỗi chung
+# Bắt lỗi tổng
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     print(f"❌ Lỗi không xác định: {context.error}", flush=True)
 
 application.add_error_handler(error_handler)
 
-# Route mặc định để UptimeRobot ping
+# Route ping UptimeRobot
 @app.route('/')
 def index():
     return "✅ Bot is running with webhook + TradingView data!"
 
-# Route webhook Telegram → chỉ xử lý update
+# Route webhook Telegram
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 async def webhook():
+    global is_initialized
     update = Update.de_json(request.get_json(), application.bot)
+
+    if not is_initialized:
+        await application.initialize()
+        is_initialized = True
+
     await application.process_update(update)
     return 'ok'
 
-# Gửi tín hiệu thủ công qua API
+# Gửi tín hiệu thủ công
 @app.route('/send', methods=['POST'])
 def send():
     data = request.get_json()
@@ -81,7 +88,7 @@ def send_signal_with_chart(signal):
     except Exception as e:
         print("❌ Lỗi khi gửi ảnh biểu đồ:", e, flush=True)
 
-# Vòng lặp quét tín hiệu TradingView
+# Auto scan tín hiệu
 def auto_scan_loop():
     global last_signal_cache
     while True:
@@ -102,9 +109,9 @@ def auto_scan_loop():
                 print("⏳ Chưa có tín hiệu TradingView phù hợp.", flush=True)
         except Exception as e:
             print("❌ Lỗi khi quét tín hiệu:", e, flush=True)
-        time.sleep(900)  # đổi xuống 60 khi test
+        time.sleep(900)
 
-# Thiết lập webhook 1 lần duy nhất khi khởi động
+# Thiết lập webhook
 def setup_webhook():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
     response = requests.post(url, json={"url": WEBHOOK_URL})
@@ -113,9 +120,8 @@ def setup_webhook():
     else:
         print("❌ Lỗi thiết lập webhook:", response.text, flush=True)
 
-# Khởi động server Flask và các tiến trình nền
+# Run
 if __name__ == "__main__":
     setup_webhook()
-    asyncio.run(application.initialize())  # 👈 Chỉ gọi initialize 1 lần duy nhất
     threading.Thread(target=auto_scan_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
