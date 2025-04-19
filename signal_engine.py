@@ -1,4 +1,4 @@
-# signal_engine.py - Quét đa tín hiệu từ Twelve Data (Engulfing + Pinbar có hướng + Morning/Evening Star + Hình ảnh)
+# signal_engine.py - Quét đa tín hiệu từ Twelve Data (Engulfing + Pinbar + Morning/Evening Star + Hình ảnh)
 import requests
 import pandas as pd
 import time
@@ -10,8 +10,8 @@ BASE_URL = "https://api.twelvedata.com/time_series"
 
 symbols = ["EUR/USD", "GBP/USD", "USD/JPY"]
 
-MIN_SL_DISTANCE = 0.0008  # 8 pips
-BUFFER = 0.0003  # 3 pips
+MIN_SL_DISTANCE = 0.0008
+BUFFER = 0.0003
 
 symbol_pip = {
     "USD/JPY": 0.01,
@@ -142,57 +142,57 @@ def get_signal(symbol, tf_label, interval):
 
     df["ema20"] = calculate_ema(df, 20)
     df["ema50"] = calculate_ema(df, 50)
-    pip = symbol_pip.get(symbol, 0.0001)
     last = df.iloc[-1]
     entry = last["close"]
+    signal_type = None
 
-    bullish = (
-        detect_bullish_engulfing(df) or
-        detect_bullish_pinbar(df) or
-        detect_morning_star(df)
-    ) and last["ema20"] > last["ema50"]
+    if detect_bullish_engulfing(df) and last["ema20"] > last["ema50"]:
+        signal_type = "Bullish Engulfing"
+        side = "Buy"
+    elif detect_bullish_pinbar(df) and last["ema20"] > last["ema50"]:
+        signal_type = "Bullish Pinbar"
+        side = "Buy"
+    elif detect_morning_star(df) and last["ema20"] > last["ema50"]:
+        signal_type = "Morning Star"
+        side = "Buy"
+    elif detect_bearish_engulfing(df) and last["ema20"] < last["ema50"]:
+        signal_type = "Bearish Engulfing"
+        side = "Sell"
+    elif detect_bearish_pinbar(df) and last["ema20"] < last["ema50"]:
+        signal_type = "Bearish Pinbar"
+        side = "Sell"
+    elif detect_evening_star(df) and last["ema20"] < last["ema50"]:
+        signal_type = "Evening Star"
+        side = "Sell"
+    else:
+        return None
 
-    bearish = (
-        detect_bearish_engulfing(df) or
-        detect_bearish_pinbar(df) or
-        detect_evening_star(df)
-    ) and last["ema20"] < last["ema50"]
-
-    if bullish:
+    candle_time = str(last["datetime"])
+    if side == "Buy":
         sl = df.iloc[-5:]["low"].min() - BUFFER
         tp = find_swing_high(df)
         if not sl or not tp: return None
         rr = (tp - entry) / (entry - sl)
-        if rr < 1.7: return None
-        return {
-            "symbol": symbol,
-            "side": "Buy",
-            "rr": round(rr, 2),
-            "entry": round(entry, 4),
-            "sl": round(sl, 4),
-            "tp": round(tp, 4),
-            "tf": tf_label,
-            "chart": draw_chart(df, symbol, entry, sl, tp, tf_label)
-        }
-
-    elif bearish:
+    else:
         sl = df.iloc[-5:]["high"].max() + BUFFER
         tp = find_swing_low(df)
         if not sl or not tp: return None
         rr = (entry - tp) / (sl - entry)
-        if rr < 1.7: return None
-        return {
-            "symbol": symbol,
-            "side": "Sell",
-            "rr": round(rr, 2),
-            "entry": round(entry, 4),
-            "sl": round(sl, 4),
-            "tp": round(tp, 4),
-            "tf": tf_label,
-            "chart": draw_chart(df, symbol, entry, sl, tp, tf_label)
-        }
 
-    return None
+    if rr < 1.7: return None
+
+    return {
+        "symbol": symbol,
+        "side": side,
+        "rr": round(rr, 2),
+        "entry": round(entry, 4),
+        "sl": round(sl, 4),
+        "tp": round(tp, 4),
+        "tf": tf_label,
+        "pattern": signal_type,
+        "candle_time": candle_time,
+        "chart": draw_chart(df, symbol, entry, sl, tp, tf_label)
+    }
 
 def get_trade_signal():
     results = []
