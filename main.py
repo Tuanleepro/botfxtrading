@@ -22,9 +22,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("❌ Lỗi khi xử lý /start:", e, flush=True)
 
-# Gửi ảnh + thông điệp
+# Gửi ảnh + thông điệp có pattern và candle_time
 def send_signal_with_chart(signal):
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
+📅 Time: {signal['candle_time']}
+🕯 Pattern: {signal['pattern']}
 🎯 Entry: {signal['entry']}
 🛡 SL: {signal['sl']}
 🎁 TP: {signal['tp']}
