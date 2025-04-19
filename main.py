@@ -14,6 +14,15 @@ CHAT_ID = "576589496"
 app = Flask(__name__)
 last_signal_cache = []
 
+# ==== Hàm tính khối lượng lot ====
+def calculate_lot_size(entry, sl, symbol, balance=10000, risk_percent=0.005):
+    pip_value = 10  # USD/pip/lot (cho cặp như EURUSD, GBPUSD)
+    pip = abs(entry - sl)
+    if pip == 0:
+        return 0.0
+    lot = (balance * risk_percent) / (pip * pip_value)
+    return round(lot, 2)
+
 # /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -22,15 +31,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("❌ Lỗi khi xử lý /start:", e, flush=True)
 
-# Gửi ảnh + thông điệp có pattern và candle_time
+# Gửi ảnh + thông điệp có pattern, candle_time, lot size
 def send_signal_with_chart(signal):
+    lot_size = calculate_lot_size(signal["entry"], signal["sl"], signal["symbol"])
     msg = f"""📊 {signal['side']} {signal['symbol']} ({signal['tf']})
 📅 Time: {signal['candle_time']}
 🕯 Pattern: {signal['pattern']}
 🎯 Entry: {signal['entry']}
 🛡 SL: {signal['sl']}
 🎁 TP: {signal['tp']}
-📈 RR: {signal['rr']}"""
+📈 RR: {signal['rr']}
+📌 Lot size: {lot_size} lot (0.5% rủi ro / $10,000)"""
     try:
         with open(signal["chart"], "rb") as photo:
             response = requests.post(
@@ -67,7 +78,7 @@ def auto_scan_loop():
                 print("⏳ Chưa có tín hiệu TradingView phù hợp.", flush=True)
         except Exception as e:
             print("❌ Lỗi khi quét tín hiệu:", e, flush=True)
-        time.sleep(900)  # mỗi 15 phút
+        time.sleep(900)
 
 # Route gửi thủ công
 @app.route("/send", methods=["POST"])
